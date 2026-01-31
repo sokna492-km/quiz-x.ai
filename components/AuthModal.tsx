@@ -133,6 +133,7 @@ const AuthModal: React.FC<Props> = ({ onLogin, onClose }) => {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Full Name"
+                autoComplete="name"
                 className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-600 focus:bg-white dark:focus:bg-slate-950 rounded-2xl outline-none text-slate-900 dark:text-white text-base transition-all shadow-inner"
               />
             )}
@@ -142,6 +143,7 @@ const AuthModal: React.FC<Props> = ({ onLogin, onClose }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email Address"
+              autoComplete="email"
               className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-600 focus:bg-white dark:focus:bg-slate-950 rounded-2xl outline-none text-slate-900 dark:text-white text-base transition-all shadow-inner"
             />
 
@@ -150,6 +152,7 @@ const AuthModal: React.FC<Props> = ({ onLogin, onClose }) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
+              autoComplete={isSignUp ? "new-password" : "current-password"}
               className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-600 focus:bg-white dark:focus:bg-slate-950 rounded-2xl outline-none text-slate-900 dark:text-white text-base transition-all shadow-inner"
             />
 
