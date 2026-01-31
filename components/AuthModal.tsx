@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { User } from '../types';
+import { signUpWithEmail, signInWithEmail, signInWithGoogle } from '../services/authService';
 
 interface Props {
   onLogin: (user: User) => void;
@@ -17,29 +18,23 @@ const AuthModal: React.FC<Props> = ({ onLogin, onClose }) => {
   const [selectedAvatar] = useState(AVATARS[0]);
   const [error, setError] = useState('');
 
-  const getRegisteredUsers = (): any[] => {
-    const users = localStorage.getItem('omni_quiz_registered_users');
-    return users ? JSON.parse(users) : [];
-  };
-
   const validateEmail = (e: string) => {
     return String(e)
       .toLowerCase()
       .match(/^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/);
   };
 
-  const handleGoogleSignIn = () => {
-    const googleUser = {
-      id: 'google_' + Math.random().toString(36).substr(2, 9),
-      name: 'Google User',
-      email: 'user@google.com',
-      avatar: '🚀',
-      createdAt: Date.now()
-    };
-    onLogin(googleUser);
+  const handleGoogleSignIn = async () => {
+    try {
+      setError('');
+      const user = await signInWithGoogle();
+      onLogin(user);
+    } catch (err: any) {
+      setError(err.message || 'Google sign-in failed.');
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -58,52 +53,33 @@ const AuthModal: React.FC<Props> = ({ onLogin, onClose }) => {
       return;
     }
 
-    const registeredUsers = getRegisteredUsers();
+    try {
+      if (isSignUp) {
+        if (!name.trim()) {
+          setError('Please enter your name.');
+          return;
+        }
 
-    if (isSignUp) {
-      if (!name.trim()) {
-        setError('Please enter your name.');
-        return;
-      }
-      
-      const userExists = registeredUsers.some((u: any) => u.email === email.trim());
-      if (userExists) {
-        setError('Email already registered.');
-        return;
-      }
-
-      const newUser = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: name.trim(),
-        email: email.trim(),
-        password: password.trim(),
-        avatar: selectedAvatar,
-        createdAt: Date.now()
-      };
-
-      localStorage.setItem('omni_quiz_registered_users', JSON.stringify([...registeredUsers, newUser]));
-      const { password: _, ...userSession } = newUser;
-      onLogin(userSession as User);
-    } else {
-      const user = registeredUsers.find((u: any) => u.email === email.trim() && u.password === password.trim());
-      if (user) {
-        const { password: _, ...userSession } = user;
-        onLogin(userSession as User);
+        const user = await signUpWithEmail(email.trim(), password.trim(), name.trim());
+        onLogin(user);
       } else {
-        setError('Invalid credentials.');
+        const user = await signInWithEmail(email.trim(), password.trim());
+        onLogin(user);
       }
+    } catch (err: any) {
+      setError(err.message || 'Authentication failed.');
     }
   };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 overflow-y-auto">
-      <div 
-        className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm animate-fade-in" 
+      <div
+        className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm animate-fade-in"
         onClick={onClose}
       />
-      
+
       <div className="relative bg-white dark:bg-slate-900 w-full max-w-[400px] p-6 md:p-8 rounded-[2.5rem] shadow-2xl border border-white/10 animate-[zoom-in_0.3s_ease-out] my-auto">
-        <button 
+        <button
           onClick={onClose}
           className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1"
         >
@@ -189,7 +165,7 @@ const AuthModal: React.FC<Props> = ({ onLogin, onClose }) => {
         <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
           <p className="text-sm text-slate-500 font-medium">
             {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-            <button 
+            <button
               onClick={() => { setIsSignUp(!isSignUp); setError(''); }}
               className="ml-2 font-black text-blue-600 hover:text-blue-700 transition-colors decoration-2 underline-offset-4 hover:underline"
             >

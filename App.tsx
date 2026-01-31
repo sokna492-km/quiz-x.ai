@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Quiz, Language, Subject, Difficulty, QuizAttempt, User, SubscriptionTier } from './types';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { Quiz, Language, Subject, Difficulty, QuizAttempt, User } from './types';
 import { generateQuiz } from './services/geminiService';
 import QuizSetup from './components/QuizSetup';
 import QuizView from './components/QuizView';
@@ -12,27 +13,49 @@ import SubscriptionModal from './components/SubscriptionModal';
 import { UI_STRINGS } from './constants';
 
 const App: React.FC = () => {
-  const [view, setView] = useState<'setup' | 'quiz' | 'result'>('setup');
-  const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null);
-  const [userAnswers, setUserAnswers] = useState<number[]>([]);
-  const [timeTaken, setTimeTaken] = useState(0);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Persistent Active Quiz State
+  const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(() => {
+    try {
+      const saved = localStorage.getItem('omni_quiz_active_quiz');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  // Persistent Session State (Answers & Time)
+  const [userAnswers, setUserAnswers] = useState<number[]>(() => {
+    try {
+      const saved = localStorage.getItem('omni_quiz_session_answers');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  const [timeTaken, setTimeTaken] = useState<number>(() => {
+    const saved = localStorage.getItem('omni_quiz_session_time');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+
   const [isLoading, setIsLoading] = useState(false);
   const [history, setHistory] = useState<QuizAttempt[]>([]);
   const [currentLang, setCurrentLang] = useState<Language>('en');
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  
+
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('omni_quiz_user');
     if (saved) {
-      const user = JSON.parse(saved);
-      const now = Date.now();
-      if (user.quizUsage.resetAt < now) {
-        user.quizUsage.count = 0;
-        user.quizUsage.resetAt = now + 7 * 24 * 60 * 60 * 1000;
-        localStorage.setItem('omni_quiz_user', JSON.stringify(user));
-      }
-      return user;
+      try {
+        const user = JSON.parse(saved);
+        const now = Date.now();
+        if (user.quizUsage && user.quizUsage.resetAt < now) {
+          user.quizUsage.count = 0;
+          user.quizUsage.resetAt = now + 7 * 24 * 60 * 60 * 1000;
+          localStorage.setItem('omni_quiz_user', JSON.stringify(user));
+        }
+        return user;
+      } catch { return null; }
     }
     return null;
   });
@@ -42,6 +65,7 @@ const App: React.FC = () => {
     return saved === 'dark';
   });
 
+  // Load History
   useEffect(() => {
     const saved = localStorage.getItem('omni_quiz_history');
     if (saved) {
@@ -53,6 +77,7 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Theme Sync
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
@@ -62,6 +87,20 @@ const App: React.FC = () => {
       localStorage.setItem('omni_quiz_theme', 'light');
     }
   }, [isDarkMode]);
+
+  // Persist Active Quiz & Session
+  useEffect(() => {
+    if (activeQuiz) {
+      localStorage.setItem('omni_quiz_active_quiz', JSON.stringify(activeQuiz));
+    } else {
+      localStorage.removeItem('omni_quiz_active_quiz');
+    }
+  }, [activeQuiz]);
+
+  useEffect(() => {
+    localStorage.setItem('omni_quiz_session_answers', JSON.stringify(userAnswers));
+    localStorage.setItem('omni_quiz_session_time', timeTaken.toString());
+  }, [userAnswers, timeTaken]);
 
   const handleStartQuiz = async (lang: Language, subject: Subject, difficulty: Difficulty) => {
     if (currentUser && currentUser.subscriptionTier === 'free') {
@@ -73,9 +112,14 @@ const App: React.FC = () => {
 
     setIsLoading(true);
     setCurrentLang(lang);
+
+    // Clear previous session
+    setUserAnswers([]);
+    setTimeTaken(0);
+
     try {
       const quiz = await generateQuiz(subject, difficulty, lang);
-      
+
       if (currentUser) {
         const updatedUser = {
           ...currentUser,
@@ -89,7 +133,7 @@ const App: React.FC = () => {
       }
 
       setActiveQuiz(quiz);
-      setView('quiz');
+      navigate('/quiz');
     } catch (error) {
       console.error("Failed to generate quiz", error);
       alert("Something went wrong generating the quiz. Please try again.");
@@ -101,11 +145,12 @@ const App: React.FC = () => {
   const handleQuizComplete = (answers: number[], finalTime: number) => {
     setUserAnswers(answers);
     setTimeTaken(finalTime);
-    setView('result');
 
     if (activeQuiz && currentUser) {
       saveScore(answers, finalTime, currentUser.id);
     }
+
+    navigate('/result');
   };
 
   const saveScore = (answers: number[], finalTime: number, userId: string) => {
@@ -135,13 +180,14 @@ const App: React.FC = () => {
   const handleRetry = () => {
     setUserAnswers([]);
     setTimeTaken(0);
-    setView('quiz');
+    navigate('/quiz');
   };
 
   const handleGoHome = () => {
-    setView('setup');
     setActiveQuiz(null);
     setUserAnswers([]);
+    setTimeTaken(0);
+    navigate('/');
   };
 
   const handleLogin = (user: User) => {
@@ -156,8 +202,9 @@ const App: React.FC = () => {
     setCurrentUser(userWithUsage);
     localStorage.setItem('omni_quiz_user', JSON.stringify(userWithUsage));
     setShowAuthModal(false);
-    
-    if (view === 'result' && activeQuiz) {
+
+    // If logging in from result screen, save the score
+    if (location.pathname === '/result' && activeQuiz) {
       saveScore(userAnswers, timeTaken, userWithUsage.id);
     }
   };
@@ -165,6 +212,7 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('omni_quiz_user');
+    navigate('/');
   };
 
   const handleUpgrade = (plan: 'monthly' | 'annually') => {
@@ -179,7 +227,7 @@ const App: React.FC = () => {
       subscriptionTier: 'pro',
       subscriptionExpiry: Date.now() + (plan === 'monthly' ? 30 : 365) * 24 * 60 * 60 * 1000
     };
-    
+
     setCurrentUser(updatedUser);
     localStorage.setItem('omni_quiz_user', JSON.stringify(updatedUser));
     setShowSubscriptionModal(false);
@@ -189,12 +237,16 @@ const App: React.FC = () => {
   const strings = UI_STRINGS[currentLang];
   const userHistory = history.filter(h => h.userId === (currentUser?.id || 'guest'));
 
+  const isQuizView = location.pathname === '/quiz';
+
   return (
     <div className="min-h-screen pb-20 dark:bg-slate-950 transition-colors duration-300">
-      {view !== 'quiz' && (
+
+      {/* Header - Only show if not in active quiz */}
+      {!isQuizView && (
         <header className="relative py-4 md:py-6 px-4 md:px-8 border-b border-slate-100 dark:border-slate-900 bg-white/50 dark:bg-slate-950/50 backdrop-blur-xl z-50">
           <div className="max-w-6xl mx-auto flex justify-between items-center gap-4">
-            <button 
+            <button
               onClick={handleGoHome}
               className="flex items-center gap-3 md:gap-5 hover:opacity-90 transition-all active:scale-95 text-left outline-none group"
             >
@@ -207,7 +259,7 @@ const App: React.FC = () => {
             </button>
 
             <div className="flex items-center gap-3 md:gap-6">
-              <button 
+              <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
                 className="p-3 md:p-4 rounded-xl md:rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-90"
                 aria-label="Toggle Dark Mode"
@@ -239,7 +291,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <button 
+                <button
                   onClick={() => setShowAuthModal(true)}
                   className="px-5 md:px-8 py-2.5 md:py-3.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl md:rounded-2xl font-black text-sm md:text-base shadow-xl hover:scale-[1.03] transition-all active:scale-95"
                 >
@@ -252,53 +304,55 @@ const App: React.FC = () => {
       )}
 
       <main className="px-4 md:px-0">
-        {view === 'setup' && (
-          <div className="space-y-4 md:space-y-6 pb-12">
-            {!isLoading && (
-              <div className="max-w-4xl mx-auto text-center pt-6 md:pt-8 pb-1 animate-[fade-in-up_0.6s_ease-out]">
-                <div className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/50 shadow-sm backdrop-blur-sm">
-                  <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
-                  </svg>
-                  <p className="text-slate-600 dark:text-slate-300 text-sm md:text-base font-bold tracking-tight">
-                    {strings.tagline.split('AI-powered').map((part: string, i: number) => (
-                      <React.Fragment key={i}>
-                        {i > 0 && (
-                          <span className="bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent px-0.5">
-                            AI-powered
-                          </span>
-                        )}
-                        {part}
-                      </React.Fragment>
-                    ))}
-                  </p>
+        <Routes>
+          {/* Home Route */}
+          <Route path="/" element={
+            <div className="space-y-4 md:space-y-6 pb-12">
+              {!isLoading && (
+                <div className="max-w-4xl mx-auto text-center pt-6 md:pt-8 pb-1 animate-[fade-in-up_0.6s_ease-out]">
+                  <div className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/50 shadow-sm backdrop-blur-sm">
+                    <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+                    </svg>
+                    <p className="text-slate-600 dark:text-slate-300 text-sm md:text-base font-bold tracking-tight">
+                      {strings.tagline.split('AI-powered').map((part: string, i: number) => (
+                        <React.Fragment key={i}>
+                          {i > 0 && (
+                            <span className="bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent px-0.5">
+                              AI-powered
+                            </span>
+                          )}
+                          {part}
+                        </React.Fragment>
+                      ))}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
-            
-            <QuizSetup 
-              onStart={handleStartQuiz} 
-              isLoading={isLoading} 
-              user={currentUser} 
-              onOpenSubscription={() => setShowSubscriptionModal(true)} 
-            />
-            
-            {!isLoading && userHistory.length > 0 && (
-              <div className="space-y-8 md:space-y-12">
-                <StatsDashboard history={userHistory} lang={currentLang} />
-                <HistoryView history={userHistory} lang={currentLang} />
-              </div>
-            )}
+              )}
 
-            {!currentUser && !isLoading && (
-               <div className="max-w-2xl mx-auto pb-6">
+              <QuizSetup
+                onStart={handleStartQuiz}
+                isLoading={isLoading}
+                user={currentUser}
+                onOpenSubscription={() => setShowSubscriptionModal(true)}
+              />
+
+              {!isLoading && userHistory.length > 0 && (
+                <div className="space-y-8 md:space-y-12">
+                  <StatsDashboard history={userHistory} lang={currentLang} />
+                  <HistoryView history={userHistory} lang={currentLang} />
+                </div>
+              )}
+
+              {!currentUser && !isLoading && (
+                <div className="max-w-2xl mx-auto pb-6">
                   <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 md:p-8 rounded-[2rem] text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 group transition-all duration-500">
                     <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-48 md:w-64 h-48 md:h-64 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-colors"></div>
                     <div className="relative z-10 space-y-2 max-w-md text-center md:text-left">
                       <h3 className="text-xl md:text-2xl font-extrabold tracking-tight leading-tight">Save your achievements!</h3>
                       <p className="text-blue-100 text-sm md:text-base opacity-90 leading-relaxed">Create a profile to track scores and download personalized certificates.</p>
                     </div>
-                    <button 
+                    <button
                       onClick={() => setShowAuthModal(true)}
                       className="relative z-10 whitespace-nowrap px-6 md:px-8 py-3 md:py-4 bg-white text-blue-600 font-extrabold text-base md:text-lg rounded-xl md:rounded-2xl hover:shadow-lg hover:scale-[1.03] transition-all active:scale-95 flex items-center gap-2 md:gap-3 group/btn shadow-md w-full md:w-auto justify-center"
                     >
@@ -308,26 +362,49 @@ const App: React.FC = () => {
                       </svg>
                     </button>
                   </div>
-               </div>
-            )}
-          </div>
-        )}
-        
-        {view === 'quiz' && activeQuiz && (
-          <QuizView quiz={activeQuiz} onComplete={handleQuizComplete} />
-        )}
-        
-        {view === 'result' && activeQuiz && (
-          <ResultView 
-            quiz={activeQuiz} 
-            userAnswers={userAnswers} 
-            timeTaken={timeTaken} 
-            onHome={handleGoHome} 
-            onRetry={handleRetry}
-            currentUser={currentUser}
-            onOpenAuth={() => setShowAuthModal(true)}
-          />
-        )}
+                </div>
+              )}
+            </div>
+          } />
+
+          {/* Quiz Route */}
+          <Route path="/quiz" element={
+            activeQuiz ? (
+              <QuizView
+                quiz={activeQuiz}
+                onComplete={handleQuizComplete}
+                initialAnswers={userAnswers}
+                initialTimeLeft={activeQuiz.durationSeconds - timeTaken}
+                onProgressUpdate={(ans, tLeft) => {
+                  setUserAnswers(ans);
+                  setTimeTaken(activeQuiz.durationSeconds - tLeft);
+                }}
+              />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } />
+
+          {/* Result Route */}
+          <Route path="/result" element={
+            activeQuiz ? (
+              <ResultView
+                quiz={activeQuiz}
+                userAnswers={userAnswers}
+                timeTaken={timeTaken}
+                onHome={handleGoHome}
+                onRetry={handleRetry}
+                currentUser={currentUser}
+                onOpenAuth={() => setShowAuthModal(true)}
+              />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } />
+
+          {/* Catch all */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
 
       {showAuthModal && (
@@ -335,16 +412,16 @@ const App: React.FC = () => {
       )}
 
       {showSubscriptionModal && (
-        <SubscriptionModal 
-          lang={currentLang} 
-          onClose={() => setShowSubscriptionModal(false)} 
-          onUpgrade={handleUpgrade} 
+        <SubscriptionModal
+          lang={currentLang}
+          onClose={() => setShowSubscriptionModal(false)}
+          onUpgrade={handleUpgrade}
         />
       )}
 
-      {view === 'setup' && !isLoading && (
+      {location.pathname === '/' && !isLoading && (
         <footer className="fixed bottom-0 left-0 right-0 p-4 md:p-5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 flex justify-center items-center z-40">
-          <p className="text-[10px] md:text-sm text-slate-400 dark:text-slate-500 font-black uppercase tracking-widest">Powered by Gemini 3 Flash & React</p>
+          <p className="text-[10px] md:text-sm text-slate-400 dark:text-slate-500 font-black uppercase tracking-widest">Powered by Gemini 2.0 Flash & React</p>
         </footer>
       )}
 
