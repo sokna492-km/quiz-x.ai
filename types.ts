@@ -2,6 +2,7 @@
 export type Language = 'en' | 'km' | 'th' | 'vi';
 export type Subject = 'mathematics' | 'physics' | 'chemistry' | 'biology';
 export type Difficulty = 'easy' | 'medium' | 'hard';
+export type QuestionType = 'multiple-choice' | 'true-false' | 'fill-in-the-blank' | 'matching';
 
 export type SubscriptionTier = 'free' | 'pro';
 
@@ -25,6 +26,7 @@ export interface Question {
   options: string[];
   correctIndex: number;
   explanation: string;
+  type: QuestionType;
 }
 
 export interface Quiz {

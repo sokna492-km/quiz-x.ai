@@ -159,14 +159,20 @@ const QuizSetup: React.FC<Props> = ({ onStart, isLoading, user, onOpenSubscripti
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-2 md:p-10 space-y-8 md:space-y-12 animate-fade-in">
+    <div className="max-w-3xl mx-auto p-2 md:p-10 space-y-10 md:space-y-14 animate-fade-in">
       <section className="space-y-4 md:space-y-5">
-        <h3 className="text-xs md:text-base font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">{strings.selectLanguage}</h3>
+        <div className="flex items-center gap-3 px-2">
+          <div className="w-1.5 h-6 bg-blue-600 rounded-full"></div>
+          <h3 className="text-sm md:text-base font-black text-slate-800 dark:text-slate-200 uppercase tracking-[0.2em]">{strings.selectLanguage}</h3>
+        </div>
         <LanguageSelector selected={lang} onSelect={setLang} />
       </section>
 
-      <section className="space-y-4 md:space-y-5">
-        <h3 className="text-xs md:text-base font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">{strings.selectSubject}</h3>
+      <section className="space-y-4 md:space-y-6">
+        <div className="flex items-center gap-3 px-2">
+          <div className="w-1.5 h-6 bg-blue-600 rounded-full"></div>
+          <h3 className="text-sm md:text-base font-black text-slate-800 dark:text-slate-200 uppercase tracking-[0.2em]">{strings.selectSubject}</h3>
+        </div>
         <div className="grid grid-cols-2 gap-3 md:gap-6">
           {SUBJECTS.map((s) => (
             <button
@@ -185,8 +191,11 @@ const QuizSetup: React.FC<Props> = ({ onStart, isLoading, user, onOpenSubscripti
         </div>
       </section>
 
-      <section className="space-y-4 md:space-y-5">
-        <h3 className="text-xs md:text-base font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">{strings.selectDifficulty}</h3>
+      <section className="space-y-4 md:space-y-6">
+        <div className="flex items-center gap-3 px-2">
+          <div className="w-1.5 h-6 bg-blue-600 rounded-full"></div>
+          <h3 className="text-sm md:text-base font-black text-slate-800 dark:text-slate-200 uppercase tracking-[0.2em]">{strings.selectDifficulty}</h3>
+        </div>
         <div className="flex gap-2 md:gap-3">
           {DIFFICULTIES.map((d) => (
             <button

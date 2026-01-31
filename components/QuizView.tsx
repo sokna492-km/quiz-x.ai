@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Quiz, Language } from '../types';
+import { Quiz, Language, QuestionType } from '../types';
 import { UI_STRINGS } from '../constants';
 
 interface Props {
@@ -39,7 +39,33 @@ const QuizView: React.FC<Props> = ({ quiz, onComplete }) => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const getTypeLabel = (type: QuestionType) => {
+    switch (type) {
+      case 'true-false': return 'True / False';
+      case 'fill-in-the-blank': return 'Fill in the Blank';
+      case 'matching': return 'Matching / Sequence';
+      default: return 'Multiple Choice';
+    }
+  };
+
   const progress = ((currentIndex + 1) / quiz.questions.length) * 100;
+
+  // Format text to highlight placeholders if it's a fill-in-the-blank question
+  const renderQuestionText = (text: string) => {
+    if (currentQuestion.type === 'fill-in-the-blank' && text.includes('____')) {
+      const parts = text.split('____');
+      return (
+        <>
+          {parts[0]}
+          <span className="inline-block min-w-[80px] border-b-4 border-blue-500 mx-2 text-blue-600">
+            {answers[currentIndex] !== -1 ? currentQuestion.options[answers[currentIndex]] : '...'}
+          </span>
+          {parts[1]}
+        </>
+      );
+    }
+    return text;
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 md:px-6 py-4 md:py-8 space-y-6 md:space-y-8 animate-fade-in relative">
@@ -55,9 +81,14 @@ const QuizView: React.FC<Props> = ({ quiz, onComplete }) => {
            <h3 className="text-sm font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.3em]">
              Quiz X<span className="text-blue-500">.ai</span>
            </h3>
-           <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-             {strings[quiz.subject]}
-           </span>
+           <div className="flex gap-2">
+             <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/40 rounded-full text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest border border-blue-200 dark:border-blue-800">
+               {getTypeLabel(currentQuestion.type)}
+             </span>
+             <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+               {strings[quiz.subject]}
+             </span>
+           </div>
         </div>
 
         <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 md:p-8 rounded-2xl md:rounded-3xl shadow-md border border-slate-100 dark:border-slate-800">
@@ -82,8 +113,8 @@ const QuizView: React.FC<Props> = ({ quiz, onComplete }) => {
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-[2rem] md:rounded-[3rem] p-6 md:p-14 shadow-2xl border border-slate-100 dark:border-slate-800 space-y-8 md:space-y-10 min-h-[300px] md:min-h-[400px] flex flex-col justify-center">
-        <h2 className="text-xl md:text-4xl font-extrabold text-slate-900 dark:text-slate-100 leading-tight">
-          {currentQuestion.text}
+        <h2 className="text-xl md:text-3xl font-extrabold text-slate-900 dark:text-white leading-tight">
+          {renderQuestionText(currentQuestion.text)}
         </h2>
 
         <div className="grid gap-3 md:gap-4">

@@ -16,10 +16,19 @@ export async function generateQuiz(
     vi: "Vietnamese"
   };
 
-  const prompt = `Generate a 10-question comprehensive quiz for ${subject} at ${difficulty} difficulty level in ${languageNames[language]} language. 
-  Include a mix of standard multiple-choice questions and "fill-in-the-blank" style questions (where the question text contains a blank "____" and the options are possible words to complete it).
-  Ensure all questions are educationally accurate and challenging for the selected level.
-  Each question must have exactly 4 options and a detailed educational explanation in ${languageNames[language]}.`;
+  const prompt = `Generate a 10-question comprehensive and diverse quiz for ${subject} at ${difficulty} difficulty level in ${languageNames[language]} language. 
+  
+  You MUST include a balanced mix of the following 4 question types:
+  1. Conceptual Multiple-Choice: Standard conceptual questions.
+  2. Fill-in-the-blank: Use "____" in the question text. Options are words to complete it.
+  3. True/False: The question is a statement. Option index 0 must be "True" and index 1 must be "False" (translated appropriately).
+  4. Matching/Sequence: List item sets in the question (e.g. 1. A, 2. B) and provide mapping combinations in the options (e.g. A: 1-X, 2-Y).
+
+  Requirements:
+  - Language: All content (title, questions, options, explanations) MUST be in ${languageNames[language]}.
+  - Structure: Exactly 4 options for every question.
+  - Accuracy: Scientifically and educationally accurate for the ${difficulty} level.
+  - Explanation: Provide a detailed, helpful pedagogical explanation for each answer.`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
@@ -36,6 +45,10 @@ export async function generateQuiz(
               type: Type.OBJECT,
               properties: {
                 text: { type: Type.STRING },
+                type: { 
+                  type: Type.STRING, 
+                  description: "One of: multiple-choice, true-false, fill-in-the-blank, matching" 
+                },
                 options: {
                   type: Type.ARRAY,
                   items: { type: Type.STRING }
@@ -43,7 +56,7 @@ export async function generateQuiz(
                 correctIndex: { type: Type.INTEGER },
                 explanation: { type: Type.STRING }
               },
-              required: ["text", "options", "correctIndex", "explanation"]
+              required: ["text", "options", "correctIndex", "explanation", "type"]
             }
           }
         },
@@ -62,9 +75,9 @@ export async function generateQuiz(
     language,
     questions: (rawData.questions || []).map((q: any, idx: number) => ({
       ...q,
-      id: `q-${idx}`
+      id: `q-${idx}`,
+      type: q.type || 'multiple-choice'
     })),
-    // Adjusted durations for 10 questions: Easy (10m), Medium (20m), Hard (30m)
     durationSeconds: difficulty === 'easy' ? 600 : difficulty === 'medium' ? 1200 : 1800,
     createdAt: Date.now()
   };

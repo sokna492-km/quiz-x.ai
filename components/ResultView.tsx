@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Quiz, Language, User } from '../types';
+import { Quiz, Language, User, QuestionType } from '../types';
 import { UI_STRINGS } from '../constants';
 import { GoogleGenAI } from "@google/genai";
 
@@ -36,6 +36,15 @@ const ResultView: React.FC<Props> = ({ quiz, userAnswers, timeTaken, onHome, onR
       ...prev,
       [idx]: !prev[idx]
     }));
+  };
+
+  const getTypeLabel = (type: QuestionType) => {
+    switch (type) {
+      case 'true-false': return 'True / False';
+      case 'fill-in-the-blank': return 'Fill in the Blank';
+      case 'matching': return 'Matching / Sequence';
+      default: return 'Multiple Choice';
+    }
   };
 
   const handleNativeShare = async () => {
@@ -237,7 +246,11 @@ const ResultView: React.FC<Props> = ({ quiz, userAnswers, timeTaken, onHome, onR
       </div>
 
       <div className="space-y-6 md:space-y-8">
-        <h2 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-white px-2">Review Your Answers</h2>
+        <div className="flex items-center justify-between px-2">
+          <h2 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-white">Review Your Answers</h2>
+          <span className="hidden sm:block text-[10px] font-black text-slate-400 uppercase tracking-widest">PEDAGOGICAL INSIGHTS</span>
+        </div>
+        
         {quiz.questions.map((q, idx) => {
           const isCorrect = userAnswers[idx] === q.correctIndex;
           const isExpanded = expandedExplanations[idx];
@@ -247,7 +260,12 @@ const ResultView: React.FC<Props> = ({ quiz, userAnswers, timeTaken, onHome, onR
               isCorrect ? 'border-green-500' : 'border-red-500'
             }`}>
               <div className="flex flex-col md:flex-row justify-between items-start gap-3 mb-4 md:mb-6">
-                <h3 className="text-lg md:text-2xl font-black text-slate-900 dark:text-slate-100 leading-tight">{q.text}</h3>
+                <div className="space-y-2">
+                  <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[9px] font-black uppercase tracking-widest">
+                    {getTypeLabel(q.type)}
+                  </span>
+                  <h3 className="text-lg md:text-2xl font-black text-slate-900 dark:text-slate-100 leading-tight">{q.text}</h3>
+                </div>
                 <span className={`px-4 md:px-5 py-1.5 md:py-2 rounded-xl md:rounded-2xl text-[10px] md:text-[12px] font-black uppercase tracking-[0.2em] shrink-0 ${
                   isCorrect ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400'
                 }`}>
